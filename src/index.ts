@@ -1,9 +1,14 @@
 import { Telegraf } from 'telegraf';
+import { config } from 'dotenv';
 
+config();
 
-const TOKEN = process.env.TELEGRAM_TOKEN;
-const bot = new Telegraf(TOKEN);
+const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 
+bot.use(async (ctx, next) => {
+    console.log(ctx.message);
+    await next();
+});
 bot.on('text', async (ctx, next) => {
     console.log(`message from ${ctx.message.from.username} '${ctx.message.text}'`);
     await next();
@@ -12,14 +17,11 @@ bot.on('text', async (ctx, next) => {
 bot.start(ctx => ctx.reply('Ну привет, епта'));
 
 bot.hears(/.*/, async (ctx, next) => {
-    const name = ctx.message.from.username;
-    await ctx.reply(`Пошел нахуй, @${name}!!!`);
+    const name = ctx.message.from.first_name;
+    setTimeout(() => ctx.reply(`Пошел нахуй, ${name}!!!`, {disable_notification: false}), 5000);
     await next();
 });
 
-// bot.on('message', ctx => {
-//    ctx.copyMessage(ctx.chat.id);
-// });
 
 bot.hears(/please/, ctx => {
     ctx.reply(`пожалуйста`);
