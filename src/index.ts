@@ -1,12 +1,17 @@
-import { Telegraf } from 'telegraf';
+import { Telegraf, session } from 'telegraf';
 import { config } from 'dotenv';
+import nodeHtmlToImage from 'node-html-to-image';
+import { InputFileByBuffer } from 'telegraf/typings/telegram-types';
+import ImageCharts from 'image-charts';
 
 config();
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 
+bot.use(session());
 bot.use(async (ctx, next) => {
-    console.log(ctx.message);
+    console.info('Update type', ctx.updateType);
+    // console.log(JSON.stringify(ctx, null, 2));
     await next();
 });
 bot.on('text', async (ctx, next) => {
@@ -14,11 +19,19 @@ bot.on('text', async (ctx, next) => {
     await next();
 });
 
-bot.start(ctx => ctx.reply('Ну привет, епта'));
+bot.on('poll_answer', async (ctx, next) => {
+    console.info(JSON.stringify(ctx.pollAnswer, null, 2));
+    await next();
+});
+
+bot.start(ctx => {
+    ctx.reply('Ну привет, епта');
+});
 
 bot.hears(/.*/, async (ctx, next) => {
     const name = ctx.message.from.first_name;
-    setTimeout(() => ctx.reply(`Пошел нахуй, ${name}!!!`, {disable_notification: false}), 5000);
+    ctx.replyWithChatAction('typing');
+    // setTimeout(() => ctx.reply(`Пошел нахуй, ${name}!!!`, {disable_notification: false}), 5000);
     await next();
 });
 
@@ -27,11 +40,66 @@ bot.hears(/please/, ctx => {
     ctx.reply(`пожалуйста`);
 });
 
-bot.hears('dice', ctx => {
+bot.command('dices', ctx => {
     ctx.replyWithDice();
 });
 
+bot.command('html', async (ctx, next) => {
+    const img = await nodeHtmlToImage({html: `
+<html>
+    <head>
+      <style>
+        body {
+          width: 200px;
+          height: 200px;
+        }
+      </style>
+    </head>
+    <body>
+<h1>Header</h1><table border="1"><tr><th>First col</th><th>Second col</th></tr><tr><td>aaaa</td><td>bbb</td></tr></table>
+</body>
+</html>
+`});
+    const photo: InputFileByBuffer = { source: <Buffer>img };
+    ctx.replyWithPhoto(photo, {
+        caption: 'Это какой-то текст HTML'
+    });
+});
+
+bot.command('chart', async (ctx, next) => {
+    const pie = new ImageCharts().cht('p').chd('a:2.5,5,8.3').chs('100x100');
+    const buffer = await pie.toBuffer();
+    const photo: InputFileByBuffer = { source: buffer };
+    ctx.replyWithPhoto(photo);
+
+});
+
+bot.command('poll', ctx => {
+   ctx.replyWithPoll('Кто сегодня мудак?', ['Вова', 'Маша', 'Федя'], {
+       open_period: 15,
+       is_anonymous: false
+   });
+});
+
+bot.command('quiz', ctx => {
+   ctx.replyWithQuiz('Кто сегодня мудак?', ['Вова', 'Маша', 'Федя'], {
+       open_period: 15,
+       is_anonymous: false,
+       correct_option_id: 1,
+       explanation: 'Ты дурак? Конечно, Маша'
+   });
+});
 
 bot.launch()
-    .then(() => console.info('Bot was started'))
+    .then(() => {
+        bot.telegram.setMyCommands([
+            {command: 'start', description: 'Начать разговор'},
+            {command: 'dices', description: 'Бросить кубик'},
+            {command: 'html', description: 'HTML ответ'},
+            {command: 'chart', description: 'Диаграмма'},
+            {command: 'poll', description: 'Голосовалка'},
+            {command: 'quiz', description: 'Опрос'},
+        ]);
+        console.info('Bot was started');
+    })
     .catch( error => console.error('Error starting bot', error));
