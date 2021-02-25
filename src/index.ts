@@ -3,6 +3,7 @@ import { config } from 'dotenv';
 import nodeHtmlToImage from 'node-html-to-image';
 import { InputFileByBuffer } from 'telegraf/typings/telegram-types';
 import ImageCharts from 'image-charts';
+import axios from 'axios';
 
 config();
 
@@ -21,6 +22,11 @@ bot.on('text', async (ctx, next) => {
 
 bot.on('poll_answer', async (ctx, next) => {
     console.info(JSON.stringify(ctx.pollAnswer, null, 2));
+    await next();
+});
+
+bot.on('location', async (ctx, next) => {
+    console.info(JSON.stringify(ctx.message.location, null, 2));
     await next();
 });
 
@@ -90,6 +96,36 @@ bot.command('quiz', ctx => {
    });
 });
 
+bot.command('weather', async (ctx, next) => {
+    try {
+        const coords = await axios({
+            url: 'http://api.openweathermap.org/geo/1.0/direct',
+            method: 'get',
+            params: {
+                appid: process.env.WHEATHER_KEY,
+                q: 'Vladimir',
+                limit: 1
+            }
+        });
+        console.log(coords.data);
+        const weather = await axios({
+            url: 'https://api.openweathermap.org/data/2.5/onecall',
+            method: 'get',
+            params: {
+                appid: process.env.WHEATHER_KEY,
+                lat: 56.113215,
+                lon: 40.352260,
+                lang: 'ru',
+                units: 'metric'
+            }
+        });
+        ctx.reply('Получил');
+        // console.log(weather.data.daily);
+    } catch (e) {
+        ctx.reply('Хер там, а не погода!');
+    }
+});
+
 bot.launch()
     .then(() => {
         bot.telegram.setMyCommands([
@@ -99,6 +135,7 @@ bot.launch()
             {command: 'chart', description: 'Диаграмма'},
             {command: 'poll', description: 'Голосовалка'},
             {command: 'quiz', description: 'Опрос'},
+            {command: 'weather', description: 'Погода'},
         ]);
         console.info('Bot was started');
     })
